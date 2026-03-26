@@ -1,0 +1,29 @@
+{
+  "name": "keeper-bot",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "build": "tsc",
+    "start": "node dist/index.js",
+    "dev": "ts-node src/index.ts"
+  },
+  "dependencies": {
+    "@drift-labs/sdk": "^2.107.0",
+    "@drift-labs/vaults-sdk": "^0.2.0",
+    "@solana/web3.js": "^1.95.0",
+    "better-sqlite3": "^11.0.0",
+    "node-telegram-bot-api": "^0.66.0",
+    "dotenv": "^16.4.0",
+    "bn.js": "^5.2.1",
+    "bs58": "^5.0.0"
+  },
+  "devDependencies": {
+    "@types/bs58": "^4.0.0",
+    "@types/better-sqlite3": "^7.6.0",
+    "@types/node": "^20.0.0",
+    "@types/node-telegram-bot-api": "^0.64.0",
+    "@types/bn.js": "^5.1.0",
+    "ts-node": "^10.9.0",
+    "typescript": "^5.4.0"
+  }
+}

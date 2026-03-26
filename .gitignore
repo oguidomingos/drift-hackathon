@@ -1,0 +1,36 @@
+node_modules/
+dist/
+.env
+*.log
+*.sqlite
+*.db
+
+# Python
+__pycache__/
+*.pyc
+.venv/
+*.egg-info/
+
+# Backtest outputs
+packages/backtest/data/*.csv
+packages/backtest/results/
+
+# Video renders
+packages/video/out/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# IDE
+.vscode/
+.idea/
+
+# Solana keypairs — NEVER commit
+*.json
+!package.json
+!tsconfig.json
+!tsconfig.base.json
+!pnpm-workspace.yaml
+!packages/*/package.json
+!packages/video/tsconfig.json

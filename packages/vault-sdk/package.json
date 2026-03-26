@@ -1,0 +1,24 @@
+{
+  "name": "vault-sdk",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "build": "tsc",
+    "start": "ts-node src/vault-manager.ts"
+  },
+  "dependencies": {
+    "@drift-labs/sdk": "^2.107.0",
+    "@drift-labs/vaults-sdk": "^0.2.0",
+    "@solana/web3.js": "^1.95.0",
+    "dotenv": "^16.4.0",
+    "bn.js": "^5.2.1",
+    "bs58": "^5.0.0"
+  },
+  "devDependencies": {
+    "@types/bs58": "^4.0.0",
+    "@types/node": "^20.0.0",
+    "@types/bn.js": "^5.1.0",
+    "ts-node": "^10.9.0",
+    "typescript": "^5.4.0"
+  }
+}

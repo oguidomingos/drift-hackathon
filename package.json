@@ -1,0 +1,14 @@
+{
+  "name": "drift-delta-neutral-vault",
+  "private": true,
+  "version": "0.1.0",
+  "description": "Delta-Neutral Funding Rate Vault — Drift Protocol",
+  "scripts": {
+    "bot": "pnpm --filter keeper-bot start",
+    "bot:dev": "pnpm --filter keeper-bot dev",
+    "vault": "pnpm --filter vault-sdk start"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  }
+}
