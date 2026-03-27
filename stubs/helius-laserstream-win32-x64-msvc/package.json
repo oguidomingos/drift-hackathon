@@ -1,0 +1,6 @@
+{
+  "name": "helius-laserstream-win32-x64-msvc",
+  "version": "0.1.8",
+  "description": "Stub for helius-laserstream Windows native binary (we use polling, not gRPC)",
+  "main": "index.js"
+}

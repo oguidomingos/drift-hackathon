@@ -6,9 +6,17 @@
   "scripts": {
     "bot": "pnpm --filter keeper-bot start",
     "bot:dev": "pnpm --filter keeper-bot dev",
-    "vault": "pnpm --filter vault-sdk start"
+    "bot:start": "pnpm --filter keeper-bot exec npx ts-node src/index.ts",
+    "vault": "pnpm --filter vault-sdk start",
+    "test:connection": "pnpm --filter keeper-bot exec npx ts-node src/test-connection.ts",
+    "postinstall": "node scripts/patch-grpc.js"
   },
   "engines": {
     "node": ">=18.0.0"
+  },
+  "pnpm": {
+    "overrides": {
+      "helius-laserstream-win32-x64-msvc": "file:./stubs/helius-laserstream-win32-x64-msvc"
+    }
   }
 }

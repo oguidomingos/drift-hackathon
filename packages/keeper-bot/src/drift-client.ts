@@ -49,12 +49,18 @@ export async function initDriftClient(): Promise<DriftClient> {
 
   await driftClient.subscribe();
 
-  user = driftClient.getUser();
-  await user.subscribe();
-
   console.log(
     `[DriftClient] Connected to ${config.driftEnv} | Wallet: ${wallet.publicKey.toBase58()}`
   );
+
+  // Only subscribe user if account exists on-chain
+  try {
+    user = driftClient.getUser();
+    await user.subscribe();
+    console.log('[DriftClient] User account found and subscribed');
+  } catch {
+    console.log('[DriftClient] No user account on-chain (run vault-sdk init first)');
+  }
 
   return driftClient;
 }
@@ -65,8 +71,12 @@ export function getDriftClient(): DriftClient {
 }
 
 export function getUser(): User {
-  if (!user) throw new Error('User not initialized');
+  if (!user) throw new Error('User not initialized. Run: npx ts-node src/vault-manager.ts init');
   return user;
+}
+
+export function hasUser(): boolean {
+  return !!user;
 }
 
 export function getConnection(): any {
@@ -74,14 +84,17 @@ export function getConnection(): any {
 }
 
 export function getFreeCollateral(): number {
+  if (!user) return 0;
   return convertToNumber(getUser().getFreeCollateral(), QUOTE_PRECISION);
 }
 
 export function getLeverage(): number {
+  if (!user) return 0;
   return convertToNumber(getUser().getLeverage(), new (QUOTE_PRECISION.constructor as any)(10_000));
 }
 
 export function getTotalCollateral(): number {
+  if (!user) return 0;
   return convertToNumber(getUser().getTotalCollateral(), QUOTE_PRECISION);
 }
 

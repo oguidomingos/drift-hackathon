@@ -1,4 +1,4 @@
-import { initDriftClient, shutdown, getTotalCollateral } from './drift-client';
+import { initDriftClient, shutdown, getTotalCollateral, hasUser } from './drift-client';
 import {
   logFundingRates,
   updateNegativeFundingTracking,
@@ -21,6 +21,13 @@ let running = true;
 
 async function mainLoop(): Promise<void> {
   console.log(`\n========== Tick ${new Date().toISOString()} ==========`);
+
+  // If no user account yet, just log funding rates and wait
+  if (!hasUser()) {
+    console.log('[Main] No Drift user account — run vault-sdk init to create one');
+    logFundingRates();
+    return;
+  }
 
   try {
     // 1. Log current funding rates
