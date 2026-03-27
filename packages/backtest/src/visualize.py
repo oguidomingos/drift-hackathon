@@ -10,7 +10,10 @@ import numpy as np
 from pathlib import Path
 from typing import Optional
 
-from .simulator import SimulationResult
+try:
+    from .simulator import SimulationResult
+except ImportError:
+    from simulator import SimulationResult  # type: ignore
 
 RESULTS_DIR = Path(__file__).parent.parent / "results"
 

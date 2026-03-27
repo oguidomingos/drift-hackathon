@@ -12,7 +12,10 @@ import pandas as pd
 from dataclasses import dataclass, field
 from typing import Optional
 
-from .metrics import calculate_all_metrics
+try:
+    from .metrics import calculate_all_metrics
+except ImportError:
+    from metrics import calculate_all_metrics  # type: ignore
 
 
 @dataclass
@@ -20,28 +23,31 @@ class StrategyParams:
     """Strategy parameters (optimizable by GA)."""
     initial_capital: float = 100.0        # USDC
     leverage: float = 2.0
-    funding_threshold: float = 0.0005     # min hourly rate to enter (0.05%)
+    funding_threshold: float = 0.000003   # min hourly rate to enter (~2.6% ann)
     delta_threshold: float = 0.02         # max delta drift before rebalance
-    max_drawdown: float = 0.05            # 5% max drawdown → exit
+    max_drawdown: float = 0.10            # 10% max drawdown → exit
     liquidation_buffer: float = 0.20      # 20% buffer from liquidation
-    negative_funding_exit_hours: int = 24
-    taker_fee: float = 0.001              # 0.1% taker fee per leg
-    slippage: float = 0.0005              # 0.05% slippage per trade
+    negative_funding_exit_hours: int = 72  # 3 days consecutive
+    taker_fee: float = 0.0005             # 0.05% taker fee per leg (Drift)
+    slippage: float = 0.0003              # 0.03% slippage per trade
     # Multi-market allocation weights (SOL, BTC, ETH)
-    sol_weight: float = 0.5
-    btc_weight: float = 0.3
-    eth_weight: float = 0.2
+    sol_weight: float = 0.2
+    btc_weight: float = 0.5
+    eth_weight: float = 0.3
+    # Minimum hours to hold a position before allowing exit (reduces churn)
+    min_hold_hours: int = 168             # 1 week minimum hold
 
 
 @dataclass
 class Position:
     symbol: str
     entry_price: float
-    base_size: float            # positive = amount of asset
+    base_size: float
     notional: float
-    entry_time: int             # row index
+    entry_time: int
     funding_pnl: float = 0.0
     weight: float = 1.0
+    entry_cost: float = 0.0
 
 
 @dataclass
@@ -62,8 +68,9 @@ def run_backtest(
     Run the delta-neutral funding rate backtest.
 
     funding_data: dict of symbol -> DataFrame with columns:
-        - ts (or timestamp): unix timestamp
-        - fundingRate (or funding_rate): hourly funding rate as decimal
+        - ts: unix timestamp
+        - fundingRate: hourly funding rate (absolute USDC terms)
+        - oraclePriceTwap: oracle price for normalization
     """
     result = SimulationResult()
     equity = params.initial_capital
@@ -72,38 +79,38 @@ def run_backtest(
     negative_funding_counter: dict[str, int] = {}
     total_costs = 0.0
     total_funding = 0.0
+    is_killed = False  # drawdown kill switch
 
     # Normalize funding data
     normalized = {}
     for symbol, df in funding_data.items():
         df = df.copy()
-        # Try common column names
-        if 'fundingRate' in df.columns:
-            rate_col = 'fundingRate'
-        elif 'funding_rate' in df.columns:
-            rate_col = 'funding_rate'
-        elif 'rate' in df.columns:
-            rate_col = 'rate'
-        else:
-            print(f"Warning: no funding rate column found for {symbol}")
+        # Find rate column
+        rate_col = None
+        for col in ['fundingRate', 'funding_rate', 'rate']:
+            if col in df.columns:
+                rate_col = col
+                break
+        if rate_col is None:
             continue
 
-        if 'ts' in df.columns:
-            ts_col = 'ts'
-        elif 'timestamp' in df.columns:
-            ts_col = 'timestamp'
-        else:
-            ts_col = df.columns[0]
+        ts_col = 'ts' if 'ts' in df.columns else df.columns[0]
 
-        df = df.rename(columns={rate_col: 'rate', ts_col: 'ts'})
+        df = df.rename(columns={rate_col: 'raw_rate', ts_col: 'ts'})
         df = df.sort_values('ts').reset_index(drop=True)
-        df['rate'] = pd.to_numeric(df['rate'], errors='coerce')
+        df['raw_rate'] = pd.to_numeric(df['raw_rate'], errors='coerce')
+
+        # Normalize by oracle price to get per-unit hourly rate
+        if 'oraclePriceTwap' in df.columns:
+            df['rate'] = df['raw_rate'] / pd.to_numeric(df['oraclePriceTwap'], errors='coerce')
+        else:
+            df['rate'] = df['raw_rate']
+
         normalized[symbol] = df
 
     if not normalized:
         return result
 
-    # Use the longest series to determine iteration count
     max_len = max(len(df) for df in normalized.values())
 
     # Market weight mapping
@@ -113,16 +120,45 @@ def run_backtest(
         'ETH-PERP': params.eth_weight,
     }
 
+    # Transaction cost for one round-trip (open + close, both legs)
+    round_trip_cost_pct = (params.taker_fee + params.slippage) * 2 * 2  # 2 legs × 2 trades
+
     for i in range(max_len):
         hour_funding = 0.0
         hour_costs = 0.0
+
+        if is_killed:
+            # Stay idle after kill switch
+            result.equity_curve.append(equity)
+            result.funding_income.append(0.0)
+            result.costs.append(0.0)
+            continue
+
+        # Check global drawdown
+        drawdown = (peak_equity - equity) / peak_equity if peak_equity > 0 else 0
+        if drawdown > params.max_drawdown and len(positions) > 0:
+            # Kill switch — close everything
+            for sym, pos in list(positions.items()):
+                close_cost = pos.notional * (params.taker_fee + params.slippage) * 2
+                equity -= close_cost
+                hour_costs += close_cost
+                result.trades.append({
+                    'index': i, 'symbol': sym, 'action': 'CLOSE',
+                    'reason': 'max_drawdown', 'pnl': pos.funding_pnl - pos.entry_cost - close_cost,
+                })
+            positions.clear()
+            is_killed = True
+            total_costs += hour_costs
+            result.equity_curve.append(equity)
+            result.funding_income.append(0.0)
+            result.costs.append(hour_costs)
+            continue
 
         for symbol, df in normalized.items():
             if i >= len(df):
                 continue
 
-            row = df.iloc[i]
-            rate = row['rate']
+            rate = df.iloc[i]['rate']
             weight = weight_map.get(symbol, 1.0 / len(normalized))
 
             # Track negative funding
@@ -131,79 +167,71 @@ def run_backtest(
             else:
                 negative_funding_counter[symbol] = 0
 
-            # Position management
             if symbol in positions:
                 pos = positions[symbol]
+                hold_hours = i - pos.entry_time
 
-                # Exit conditions
-                should_exit = False
-                exit_reason = ""
-
-                # Negative funding too long
-                if negative_funding_counter.get(symbol, 0) >= params.negative_funding_exit_hours:
-                    should_exit = True
-                    exit_reason = "negative_funding"
-
-                # Drawdown check
-                drawdown = (peak_equity - equity) / peak_equity if peak_equity > 0 else 0
-                if drawdown > params.max_drawdown:
-                    should_exit = True
-                    exit_reason = "max_drawdown"
-
-                if should_exit:
-                    # Close position — pay taker fee + slippage
-                    close_cost = pos.notional * (params.taker_fee + params.slippage) * 2
-                    equity -= close_cost
-                    hour_costs += close_cost
-                    result.trades.append({
-                        'index': i,
-                        'symbol': symbol,
-                        'action': 'CLOSE',
-                        'reason': exit_reason,
-                        'pnl': pos.funding_pnl - close_cost,
-                    })
-                    del positions[symbol]
-                    continue
-
-                # Collect funding (short perp in positive funding = income)
-                funding_income = pos.notional * rate  # rate > 0 means shorts receive
+                # Collect funding (short perp: positive rate = income)
+                funding_income = pos.notional * rate
                 pos.funding_pnl += funding_income
                 equity += funding_income
                 hour_funding += funding_income
 
+                # Exit conditions (only after min hold period)
+                should_exit = False
+                exit_reason = ""
+
+                if hold_hours >= params.min_hold_hours:
+                    # Negative funding too long
+                    neg_hours = negative_funding_counter.get(symbol, 0)
+                    if neg_hours >= params.negative_funding_exit_hours:
+                        should_exit = True
+                        exit_reason = f"negative_funding_{neg_hours}h"
+
+                if should_exit:
+                    close_cost = pos.notional * (params.taker_fee + params.slippage) * 2
+                    equity -= close_cost
+                    hour_costs += close_cost
+                    result.trades.append({
+                        'index': i, 'symbol': symbol, 'action': 'CLOSE',
+                        'reason': exit_reason, 'pnl': pos.funding_pnl - pos.entry_cost - close_cost,
+                    })
+                    del positions[symbol]
+
             else:
                 # Entry condition: positive funding above threshold
                 if rate > params.funding_threshold:
-                    notional = equity * params.leverage * weight
-                    if notional < 1.0:
+                    # Only open if we're not already overallocated
+                    current_exposure = sum(p.notional for p in positions.values())
+                    max_exposure = equity * params.leverage
+                    available = max_exposure - current_exposure
+
+                    notional = min(equity * params.leverage * weight, available)
+                    if notional < 5.0:  # minimum $5 position
                         continue
 
-                    # Pay entry costs (taker fee + slippage on both legs)
                     entry_cost = notional * (params.taker_fee + params.slippage) * 2
                     equity -= entry_cost
                     hour_costs += entry_cost
 
                     positions[symbol] = Position(
                         symbol=symbol,
-                        entry_price=0,  # not tracking price, only funding
+                        entry_price=0,
                         base_size=notional,
                         notional=notional,
                         entry_time=i,
                         weight=weight,
+                        entry_cost=entry_cost,
                     )
 
                     result.trades.append({
-                        'index': i,
-                        'symbol': symbol,
-                        'action': 'OPEN',
-                        'reason': f'rate={rate:.6f}',
-                        'pnl': -entry_cost,
+                        'index': i, 'symbol': symbol, 'action': 'OPEN',
+                        'reason': f'rate={rate:.8f}', 'pnl': -entry_cost,
                     })
 
         total_funding += hour_funding
         total_costs += hour_costs
 
-        # Update peak
         if equity > peak_equity:
             peak_equity = equity
 
@@ -211,13 +239,15 @@ def run_backtest(
         result.funding_income.append(hour_funding)
         result.costs.append(hour_costs)
 
-        if i < len(list(normalized.values())[0]):
-            result.timestamps.append(list(normalized.values())[0].iloc[i].get('ts', i))
-
     # Close any remaining positions
-    for symbol, pos in positions.items():
+    for sym, pos in positions.items():
         close_cost = pos.notional * (params.taker_fee + params.slippage) * 2
         equity -= close_cost
+        total_costs += close_cost
+        result.trades.append({
+            'index': max_len, 'symbol': sym, 'action': 'CLOSE',
+            'reason': 'end_of_backtest', 'pnl': pos.funding_pnl - pos.entry_cost - close_cost,
+        })
 
     result.equity_curve.append(equity)
 

@@ -34,9 +34,9 @@ async function main() {
     ? `https://mainnet.helius-rpc.com/?api-key=${process.env.HELIUS_API_KEY}`
     : process.env.SOLANA_RPC_URL || 'https://api.devnet.solana.com';
 
-  const connection = new Connection(rpcUrl, 'confirmed');
+  const connection = new Connection(rpcUrl, 'confirmed') as any;
   const keypair = Keypair.fromSecretKey(bs58.decode(requireEnv('SOLANA_PRIVATE_KEY')));
-  const wallet = new Wallet(keypair);
+  const wallet = new Wallet(keypair as any);
 
   console.log(`Wallet: ${wallet.publicKey.toBase58()}`);
   console.log(`Environment: ${env}`);
@@ -47,7 +47,7 @@ async function main() {
   const bulkAccountLoader = new BulkAccountLoader(connection, 'confirmed', 10_000);
 
   const driftClient = new DriftClient({
-    connection,
+    connection: connection as any,
     wallet,
     env,
     accountSubscription: {
@@ -61,7 +61,7 @@ async function main() {
   await driftClient.subscribe();
 
   // Init Vault Client
-  const vaultClient = getVaultClient(connection, wallet, driftClient);
+  const vaultClient = getVaultClient(connection, wallet, driftClient as any);
   const vaultName = process.env.VAULT_NAME || 'DeltaNeutralFundingVault';
   const encodedName = encodeName(vaultName);
 

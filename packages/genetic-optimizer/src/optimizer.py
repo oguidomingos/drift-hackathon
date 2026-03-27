@@ -11,14 +11,36 @@ from .genome import N_PARAMS, PARAM_NAMES, genome_to_params
 from .fitness import evaluate_fitness
 
 
+def _clamp_genes(individual):
+    """Clamp all gene values to [0, 1] range."""
+    for i in range(len(individual)):
+        individual[i] = max(0.0, min(1.0, individual[i]))
+    return individual
+
+
+def _cx_blend_clamped(ind1, ind2, alpha=0.5):
+    """Blend crossover with clamping."""
+    tools.cxBlend(ind1, ind2, alpha)
+    _clamp_genes(ind1)
+    _clamp_genes(ind2)
+    return ind1, ind2
+
+
+def _mutate_gaussian_clamped(individual, mu, sigma, indpb):
+    """Gaussian mutation with clamping."""
+    tools.mutGaussian(individual, mu, sigma, indpb)
+    _clamp_genes(individual)
+    return (individual,)
+
+
 def setup_ga(
     funding_data: dict,
     population_size: int = 50,
     use_walk_forward: bool = True,
-) -> tuple[base.Toolbox, tools.Statistics, tools.HallOfFame]:
+) -> tuple:
     """Setup DEAP genetic algorithm."""
 
-    # Create fitness class (maximize Calmar ratio)
+    # Create fitness and individual classes (only once)
     if not hasattr(creator, 'FitnessMax'):
         creator.create("FitnessMax", base.Fitness, weights=(1.0,))
     if not hasattr(creator, 'Individual'):
@@ -26,7 +48,6 @@ def setup_ga(
 
     toolbox = base.Toolbox()
 
-    # Gene: random float in [0, 1]
     toolbox.register("attr_gene", random.random)
     toolbox.register(
         "individual",
@@ -37,33 +58,21 @@ def setup_ga(
     )
     toolbox.register("population", tools.initRepeat, list, toolbox.individual)
 
-    # Fitness function
     toolbox.register(
         "evaluate",
         partial(evaluate_fitness, funding_data=funding_data, use_walk_forward=use_walk_forward),
     )
 
-    # Operators
-    toolbox.register("mate", tools.cxBlend, alpha=0.5)
-    toolbox.register("mutate", tools.mutGaussian, mu=0, sigma=0.1, indpb=0.2)
+    toolbox.register("mate", _cx_blend_clamped, alpha=0.5)
+    toolbox.register("mutate", _mutate_gaussian_clamped, mu=0, sigma=0.1, indpb=0.2)
     toolbox.register("select", tools.selTournament, tournsize=3)
 
-    # Clamp genes to [0, 1] after crossover/mutation
-    def clamp_individual(individual):
-        for i in range(len(individual)):
-            individual[i] = max(0.0, min(1.0, individual[i]))
-        return individual
-
-    toolbox.decorate("mate", tools.DeltaPenalty(lambda ind: all(0 <= g <= 1 for g in ind), -100))
-
-    # Stats
-    stats = tools.Statistics(lambda ind: ind.fitness.values[0])
+    stats = tools.Statistics(lambda ind: ind.fitness.values[0] if ind.fitness.valid else -999)
     stats.register("avg", np.mean)
     stats.register("min", np.min)
     stats.register("max", np.max)
     stats.register("std", np.std)
 
-    # Hall of fame
     hof = tools.HallOfFame(5)
 
     return toolbox, stats, hof
@@ -88,12 +97,10 @@ def run_optimization(
 
     if verbose:
         print(f"\nGenetic Algorithm Optimization")
-        print(f"Population: {population_size}")
-        print(f"Generations: {n_generations}")
-        print(f"Parameters: {N_PARAMS}")
+        print(f"Population: {population_size}  |  Generations: {n_generations}  |  Params: {N_PARAMS}")
+        print(f"Walk-forward: {use_walk_forward}")
         print(f"{'='*60}")
 
-    # Run evolution
     pop, logbook = algorithms.eaSimple(
         pop,
         toolbox,
@@ -105,7 +112,6 @@ def run_optimization(
         verbose=verbose,
     )
 
-    # Best individual
     best_genome = list(hof[0])
     best_params = genome_to_params(best_genome)
     best_fitness = hof[0].fitness.values[0]
@@ -115,7 +121,10 @@ def run_optimization(
         print(f"BEST INDIVIDUAL (Calmar = {best_fitness:.4f})")
         print(f"{'='*60}")
         for name, val in best_params.items():
-            print(f"  {name}: {val:.6f}" if isinstance(val, float) else f"  {name}: {val}")
+            if isinstance(val, float):
+                print(f"  {name}: {val:.8f}")
+            else:
+                print(f"  {name}: {val}")
 
     return {
         'best_params': best_params,

@@ -7,8 +7,12 @@ Split data into train (70%) and test (30%) periods.
 import pandas as pd
 from typing import Optional
 
-from .simulator import run_backtest, StrategyParams, SimulationResult
-from .metrics import calculate_all_metrics
+try:
+    from .simulator import run_backtest, StrategyParams, SimulationResult
+    from .metrics import calculate_all_metrics
+except ImportError:
+    from simulator import run_backtest, StrategyParams, SimulationResult  # type: ignore
+    from metrics import calculate_all_metrics  # type: ignore
 
 
 def split_data(

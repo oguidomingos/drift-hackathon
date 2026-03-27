@@ -24,10 +24,10 @@ export async function initDriftClient(): Promise<DriftClient> {
 
   const connection = new Connection(getRpcUrl(), {
     commitment: 'confirmed',
-  });
+  }) as any;
 
   const keypair = Keypair.fromSecretKey(bs58.decode(config.privateKey));
-  const wallet = new Wallet(keypair);
+  const wallet = new Wallet(keypair as any);
 
   bulkAccountLoader = new BulkAccountLoader(
     connection,
@@ -69,7 +69,7 @@ export function getUser(): User {
   return user;
 }
 
-export function getConnection(): Connection {
+export function getConnection(): any {
   return getDriftClient().connection;
 }
 

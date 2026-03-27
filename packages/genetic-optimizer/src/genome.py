@@ -8,15 +8,16 @@ from dataclasses import dataclass
 # (min, max) bounds for each parameter
 PARAM_BOUNDS = {
     'leverage':                 (1.5, 5.0),
-    'funding_threshold':       (0.0001, 0.01),
+    'funding_threshold':       (0.0, 0.00005),
     'delta_threshold':         (0.01, 0.05),
-    'max_drawdown':            (0.03, 0.15),
+    'max_drawdown':            (0.05, 0.20),
     'liquidation_buffer':      (0.10, 0.30),
-    'negative_funding_exit_hours': (6, 48),
-    'taker_fee':               (0.0005, 0.002),
-    'sol_weight':              (0.1, 0.8),
-    'btc_weight':              (0.1, 0.6),
-    'eth_weight':              (0.1, 0.6),
+    'negative_funding_exit_hours': (24, 168),
+    'min_hold_hours':          (12, 336),
+    'taker_fee':               (0.0003, 0.001),
+    'sol_weight':              (0.0, 0.5),
+    'btc_weight':              (0.2, 0.8),
+    'eth_weight':              (0.0, 0.6),
 }
 
 PARAM_NAMES = list(PARAM_BOUNDS.keys())
@@ -30,7 +31,7 @@ def genome_to_params(genome: list[float]) -> dict:
         lo, hi = PARAM_BOUNDS[name]
         val = lo + genome[i] * (hi - lo)
         # Round integer params
-        if name == 'negative_funding_exit_hours':
+        if name in ('negative_funding_exit_hours', 'min_hold_hours'):
             val = int(round(val))
         params[name] = val
 
