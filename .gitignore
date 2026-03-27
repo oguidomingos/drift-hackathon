@@ -27,6 +27,7 @@ Thumbs.db
 .idea/
 
 # Solana keypairs — NEVER commit
+# (keypairs end with .json from solana-keygen — block raw *.json but allowlist specific ones)
 *.json
 !package.json
 !tsconfig.json
@@ -34,3 +35,5 @@ Thumbs.db
 !pnpm-workspace.yaml
 !packages/*/package.json
 !packages/video/tsconfig.json
+!packages/video/src/data/backtest_data.json
+!stubs/*/package.json
