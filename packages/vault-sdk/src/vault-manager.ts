@@ -68,6 +68,24 @@ async function main() {
   const action = process.argv[2] || 'info';
 
   switch (action) {
+    case 'init-account': {
+      // Create Drift user account (required before vault interactions)
+      console.log('\nInitializing Drift user account...');
+      try {
+        const [sig, userPublicKey] = await driftClient.initializeUserAccount();
+        console.log(`Drift user account created!`);
+        console.log(`User PDA: ${userPublicKey.toBase58()}`);
+        console.log(`Tx: ${sig}`);
+      } catch (e: any) {
+        if (e.message?.includes('already in use')) {
+          console.log('User account already exists.');
+        } else {
+          throw e;
+        }
+      }
+      break;
+    }
+
     case 'init': {
       console.log(`\nInitializing vault: ${vaultName}`);
 
@@ -152,7 +170,12 @@ async function main() {
     }
 
     default:
-      console.log('Usage: ts-node vault-manager.ts [init|deposit|delegate|info] [args]');
+      console.log('Usage: ts-node vault-manager.ts [init-account|init|deposit|delegate|info] [args]');
+      console.log('  init-account         Create Drift user account (run once per wallet)');
+      console.log('  init [delegate?]     Create the vault on-chain');
+      console.log('  deposit [amount]     Deposit USDC (default: 50)');
+      console.log('  delegate <pubkey>    Set bot as vault delegate');
+      console.log('  info                 Show vault details');
   }
 
   await driftClient.unsubscribe();

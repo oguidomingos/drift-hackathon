@@ -17,21 +17,44 @@
 git clone <repo-url>
 cd drift-hackathon
 
-# Install Node.js dependencies
+# Install Node.js dependencies (postinstall patches helius-laserstream for Windows)
 pnpm install
 
 # Install Python dependencies
-cd packages/backtest && pip install -e . && cd ../..
-cd packages/genetic-optimizer && pip install -e . && cd ../..
+pip install pandas numpy matplotlib requests scipy deap
 
 # Copy environment template
 cp .env.example .env
+```
+
+> **Windows note**: The `pnpm install` postinstall script automatically patches the `@drift-labs/sdk` gRPC module to work on Windows (the `helius-laserstream-win32-x64-msvc` binary is not published to npm, but we use HTTP polling — not gRPC — so this is safe).
+
+### Test Connection
+
+```bash
+# Test devnet connection (no funds needed)
+pnpm test:connection
+# Expected: Oracle prices for SOL, BTC, ETH; ✅ Connection test passed
 ```
 
 ## 2. Environment Configuration
 
 Edit `.env` with your values:
 
+**Generate a new keypair** if you don't have one:
+```bash
+cd packages/keeper-bot
+node -e "
+const {Keypair}=require('@solana/web3.js');
+const bs58=require('bs58');
+const k=Keypair.generate();
+const enc=typeof bs58.encode==='function'?bs58.encode:bs58.default.encode;
+console.log('Public key:', k.publicKey.toBase58());
+console.log('Private key (base58):', enc(k.secretKey));
+"
+```
+
+Edit `.env` with your values:
 ```env
 # Solana wallet (base58 private key)
 SOLANA_PRIVATE_KEY=your_private_key_here
@@ -42,9 +65,9 @@ SOLANA_RPC_URL=https://api.devnet.solana.com
 
 # For mainnet deployment
 # DRIFT_ENV=mainnet-beta
-# HELIUS_API_KEY=your_helius_key
+# HELIUS_API_KEY=your_helius_key (get free at helius.dev)
 
-# Telegram alerts (optional but recommended)
+# Telegram alerts (optional but recommended for monitoring)
 TELEGRAM_BOT_TOKEN=your_bot_token
 TELEGRAM_CHAT_ID=your_chat_id
 
@@ -126,20 +149,41 @@ Charts saved to `packages/backtest/results/`.
 
 ## 4. Devnet Testing
 
-### Step 4.1: Get Devnet SOL and USDC
+### Step 4.1: Test Connection (No Funds Needed)
 
 ```bash
-# Airdrop devnet SOL
-solana airdrop 2 <YOUR_WALLET_ADDRESS> --url devnet
-
-# Get devnet USDC from Drift faucet
-# Visit: https://app.drift.trade (connect wallet on devnet, use faucet)
+# Verify Drift SDK connects and reads oracle prices
+pnpm test:connection
+# Expected output:
+# [DriftClient] Connected to devnet | Wallet: <pubkey>
+# SOL-PERP: $xx.xx
+# BTC-PERP: $xxxxx.xx
+# ETH-PERP: $xxxx.xx
+# ✅ Connection test passed!
 ```
 
-### Step 4.2: Run Keeper Bot on Devnet
+### Step 4.2: Get Devnet SOL and USDC
 
 ```bash
-# Ensure .env has DRIFT_ENV=devnet
+# Option 1: Solana CLI (if installed)
+solana airdrop 2 <YOUR_WALLET_ADDRESS> --url devnet
+
+# Option 2: Web faucet
+# Visit: https://faucet.solana.com — paste your wallet address
+
+# Option 3: Drift devnet USDC faucet
+# Visit: https://app.drift.trade (switch to devnet in settings, use faucet)
+```
+
+### Step 4.3: Initialize Drift Account and Run Bot
+
+```bash
+# Initialize Drift user account on-chain (run once per wallet)
+cd packages/vault-sdk
+npx ts-node src/vault-manager.ts init-account
+
+# Return to repo root and run bot
+cd ../..
 pnpm bot:dev
 ```
 
@@ -167,23 +211,33 @@ Transfer to your Solana wallet:
 
 ### Step 5.2: Initialize the Vault
 
-```bash
-# Update .env
+Edit `.env`:
+```env
 DRIFT_ENV=mainnet-beta
-HELIUS_API_KEY=your_key
+HELIUS_API_KEY=your_helius_key
+```
 
-# Initialize vault
+Then run:
+```bash
 cd packages/vault-sdk
+
+# 1. Create Drift user account (required first time)
+npx ts-node src/vault-manager.ts init-account
+
+# 2. Create the vault
 npx ts-node src/vault-manager.ts init
 
-# Deposit USDC
+# 3. Deposit USDC
 npx ts-node src/vault-manager.ts deposit 50
 
-# Verify
+# 4. Verify
 npx ts-node src/vault-manager.ts info
 ```
 
 Save the vault address — this is your on-chain proof for judges.
+
+**Note**: Vault address is deterministic based on vault name + manager wallet. It's computed as:
+`getVaultAddressSync(VAULT_PROGRAM_ID, encodeName("DeltaNeutralFundingVault"))`
 
 ### Step 5.3: Run Keeper Bot on Mainnet
 
@@ -233,12 +287,15 @@ To pause without killing:
 
 | Issue | Solution |
 |-------|----------|
+| `Cannot find module 'helius-laserstream-win32-x64-msvc'` | Run `node scripts/patch-grpc.js` (or `pnpm install`) |
+| `DriftClient has no user for user id 0_<pubkey>` | Run `npx ts-node src/vault-manager.ts init-account` first |
 | `DriftClient not initialized` | Check RPC URL and private key in `.env` |
 | `Insufficient collateral` | Deposit more USDC to Drift account |
 | `Transaction simulation failed` | Usually RPC congestion; bot retries automatically |
 | `Rate limit exceeded` | Increase `pollingIntervalMs` in config |
-| `No funding data` | Run `data_fetcher.py` first |
+| `No funding data` | Run `cd packages/backtest && python -m src.data_fetcher` |
 | TypeScript compilation errors | Run `pnpm install` to refresh dependencies |
+| Vault init fails with `already in use` | Vault already exists — run `info` to check it |
 
 ## 8. Process Management (Production)
 
