@@ -118,7 +118,7 @@ def run_optimization(
 
     if verbose:
         print(f"\n{'='*60}")
-        print(f"BEST INDIVIDUAL (Calmar = {best_fitness:.4f})")
+        print(f"BEST INDIVIDUAL (Score = {best_fitness:.4f})")
         print(f"{'='*60}")
         for name, val in best_params.items():
             if isinstance(val, float):

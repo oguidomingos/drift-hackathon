@@ -1,0 +1,128 @@
+{
+  "best_params": {
+    "leverage": 1.5797083588180623,
+    "funding_threshold": 2.927197859622084e-05,
+    "delta_threshold": 0.020456364436209087,
+    "max_drawdown": 0.17053632670159036,
+    "liquidation_buffer": 0.3072138396423779,
+    "negative_funding_exit_hours": 178,
+    "min_hold_hours": 241,
+    "taker_fee": 0.0003993329073332527,
+    "sol_weight": 0.3255014369694817,
+    "btc_weight": 0.2885471445745899,
+    "eth_weight": 0.014760262952300955,
+    "doge_weight": 0.1489349812736118,
+    "wif_weight": 0.20573096397344534,
+    "jto_weight": 0.01652521025657033,
+    "momentum_window": 10,
+    "idle_lending_apy": 0.08485406217189265
+  },
+  "best_fitness": 10.0,
+  "hall_of_fame": [
+    {
+      "params": {
+        "leverage": 1.5797083588180623,
+        "funding_threshold": 2.927197859622084e-05,
+        "delta_threshold": 0.020456364436209087,
+        "max_drawdown": 0.17053632670159036,
+        "liquidation_buffer": 0.3072138396423779,
+        "negative_funding_exit_hours": 178,
+        "min_hold_hours": 241,
+        "taker_fee": 0.0003993329073332527,
+        "sol_weight": 0.3255014369694817,
+        "btc_weight": 0.2885471445745899,
+        "eth_weight": 0.014760262952300955,
+        "doge_weight": 0.1489349812736118,
+        "wif_weight": 0.20573096397344534,
+        "jto_weight": 0.01652521025657033,
+        "momentum_window": 10,
+        "idle_lending_apy": 0.08485406217189265
+      },
+      "fitness": 10.0
+    },
+    {
+      "params": {
+        "leverage": 2.827542280089104,
+        "funding_threshold": 3.2564219720745364e-05,
+        "delta_threshold": 0.03165509816901539,
+        "max_drawdown": 0.06107959963641079,
+        "liquidation_buffer": 0.21457154584911775,
+        "negative_funding_exit_hours": 94,
+        "min_hold_hours": 245,
+        "taker_fee": 0.0008098461173177308,
+        "sol_weight": 0.07114713461978638,
+        "btc_weight": 0.3009479720813484,
+        "eth_weight": 0.05267186893141388,
+        "doge_weight": 0.13392474037953706,
+        "wif_weight": 0.2115148112882865,
+        "jto_weight": 0.22979347269962783,
+        "momentum_window": 45,
+        "idle_lending_apy": 0.11211774542274489
+      },
+      "fitness": 10.0
+    },
+    {
+      "params": {
+        "leverage": 4.7754905989432554,
+        "funding_threshold": 1.964423720913845e-05,
+        "delta_threshold": 0.015549909562345641,
+        "max_drawdown": 0.2050227011183482,
+        "liquidation_buffer": 0.3167870394600736,
+        "negative_funding_exit_hours": 47,
+        "min_hold_hours": 492,
+        "taker_fee": 0.0007385583648489482,
+        "sol_weight": 0.19253925754369888,
+        "btc_weight": 0.11806431980171202,
+        "eth_weight": 0.2661984208224557,
+        "doge_weight": 0.0354447746754633,
+        "wif_weight": 0.20668536567396464,
+        "jto_weight": 0.18106786148270543,
+        "momentum_window": 20,
+        "idle_lending_apy": 0.03756330731338731
+      },
+      "fitness": 10.0
+    },
+    {
+      "params": {
+        "leverage": 4.65240105403077,
+        "funding_threshold": 1.9345178262283924e-05,
+        "delta_threshold": 0.04023098262037307,
+        "max_drawdown": 0.2463597419951271,
+        "liquidation_buffer": 0.1086986504897807,
+        "negative_funding_exit_hours": 138,
+        "min_hold_hours": 172,
+        "taker_fee": 0.0005765272220147042,
+        "sol_weight": 0.2402536088327397,
+        "btc_weight": 0.37874494098601363,
+        "eth_weight": 0.25561249139120845,
+        "doge_weight": 0.03596404496046714,
+        "wif_weight": 0.032279175227395124,
+        "jto_weight": 0.05714573860217591,
+        "momentum_window": 7,
+        "idle_lending_apy": 0.07426306962693957
+      },
+      "fitness": 10.0
+    },
+    {
+      "params": {
+        "leverage": 4.594614784831382,
+        "funding_threshold": 2.974770251983061e-06,
+        "delta_threshold": 0.04752877861141016,
+        "max_drawdown": 0.19521506678661238,
+        "liquidation_buffer": 0.3311378017185759,
+        "negative_funding_exit_hours": 78,
+        "min_hold_hours": 451,
+        "taker_fee": 0.0007661109416388946,
+        "sol_weight": 0.03316425383895431,
+        "btc_weight": 0.44657431891980853,
+        "eth_weight": 0.18050303884555877,
+        "doge_weight": 0.17628027444235378,
+        "wif_weight": 0.04381792086223077,
+        "jto_weight": 0.11966019309109392,
+        "momentum_window": 16,
+        "idle_lending_apy": 0.08934734379759451
+      },
+      "fitness": 10.0
+    }
+  ]
+}

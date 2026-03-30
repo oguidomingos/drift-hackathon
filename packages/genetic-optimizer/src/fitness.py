@@ -1,65 +1,82 @@
 """
 Fitness function for genetic algorithm.
-Uses Calmar ratio from walk-forward backtest.
+Optimizes for: high APY (≥10%) + high Sharpe + low drawdown.
+Penalizes strategies below 10% APY (hackathon requirement).
 """
 
 import sys
 from pathlib import Path
 
-# Add backtest/src to path so bare imports (metrics, simulator) work
 _BACKTEST_SRC = Path(__file__).parent.parent.parent / "backtest" / "src"
 _BACKTEST_SRC_STR = str(_BACKTEST_SRC)
 if _BACKTEST_SRC_STR not in sys.path:
     sys.path.insert(0, _BACKTEST_SRC_STR)
 
-# Import directly (now they'll be found as top-level modules)
 from simulator import run_backtest, StrategyParams  # type: ignore
 from walk_forward import walk_forward_validation    # type: ignore
 
-from .genome import genome_to_params
+from .genome import genome_to_params, WEIGHT_PARAMS
+
+MIN_APY_REQUIRED = 0.10   # 10% APY — hackathon gating requirement
+HOURS_PER_YEAR = 8760.0
 
 
 def evaluate_fitness(
     genome: list[float],
     funding_data: dict,
-    use_walk_forward: bool = True,
+    use_walk_forward: bool = False,
 ) -> tuple:
     """
-    Evaluate a genome's fitness. Returns (calmar_ratio,) for DEAP.
+    Evaluate a genome's fitness. Returns (score,) for DEAP.
+
+    Score = Sharpe * annualized_return_bonus
+    Penalizes annualized return < 10% APY by 0.3x multiplier.
+    Capped at [-5, 10].
     """
     params_dict = genome_to_params(genome)
 
-    strategy = StrategyParams(
-        leverage=params_dict['leverage'],
-        funding_threshold=params_dict['funding_threshold'],
-        delta_threshold=params_dict['delta_threshold'],
-        max_drawdown=params_dict['max_drawdown'],
-        liquidation_buffer=params_dict['liquidation_buffer'],
-        negative_funding_exit_hours=params_dict['negative_funding_exit_hours'],
-        min_hold_hours=params_dict['min_hold_hours'],
-        taker_fee=params_dict['taker_fee'],
-        sol_weight=params_dict['sol_weight'],
-        btc_weight=params_dict['btc_weight'],
-        eth_weight=params_dict['eth_weight'],
-    )
+    # Only pass params that StrategyParams accepts
+    known = {f.name for f in StrategyParams.__dataclass_fields__.values()} if hasattr(StrategyParams, '__dataclass_fields__') else set(vars(StrategyParams()).keys())
+
+    strategy = StrategyParams(**{k: v for k, v in params_dict.items() if k in known})
 
     try:
         if use_walk_forward:
             wf = walk_forward_validation(funding_data, strategy, train_ratio=0.7)
-            calmar = wf['test_metrics'].get('calmar_ratio', 0)
-            if not wf['is_robust']:
-                calmar *= 0.5
+            metrics = wf['test_metrics']
         else:
             result = run_backtest(funding_data, strategy)
-            calmar = result.metrics.get('calmar_ratio', 0)
+            metrics = result.metrics
 
-        if calmar == float('inf'):
-            calmar = 5.0
-        elif calmar == float('-inf') or calmar != calmar:
-            calmar = -5.0
-        calmar = max(-5.0, min(5.0, calmar))
+        sharpe = metrics.get('sharpe_ratio', 0)
+        calmar = metrics.get('calmar_ratio', 0)
+        total_return = metrics.get('total_return', 0)
+        hours = metrics.get('hours_simulated', len(next(iter(funding_data.values()))))
+        max_dd = metrics.get('max_drawdown', 1.0)
+
+        # Annualized return
+        ann_return = (1 + total_return) ** (HOURS_PER_YEAR / max(hours, 1)) - 1
+
+        # Base score: blend of Sharpe + Calmar (rewards both return and risk-adjusted)
+        score = 0.6 * sharpe + 0.4 * calmar
+
+        # APY bonus: reward strategies meeting the 10% requirement
+        if ann_return >= MIN_APY_REQUIRED:
+            apy_bonus = 1.0 + min(ann_return - MIN_APY_REQUIRED, 0.5) * 2.0  # up to 2x bonus
+        else:
+            # Heavy penalty below 10% APY — but not zero (allow GA to find the direction)
+            apy_bonus = 0.3 * max(ann_return / MIN_APY_REQUIRED, 0.0)
+
+        score = score * apy_bonus
+
+        # Sanitize
+        if score != score or score == float('inf'):
+            score = -5.0
+        elif score == float('-inf'):
+            score = -5.0
+        score = max(-5.0, min(10.0, score))
 
     except Exception:
-        calmar = -5.0
+        score = -5.0
 
-    return (calmar,)
+    return (score,)

@@ -13,7 +13,6 @@ __pycache__/
 
 # Backtest outputs
 packages/backtest/data/*.csv
-packages/backtest/results/
 
 # Video renders
 packages/video/out/
@@ -36,4 +35,6 @@ Thumbs.db
 !packages/*/package.json
 !packages/video/tsconfig.json
 !packages/video/src/data/backtest_data.json
+!packages/backtest/results/backtest_data.json
+!packages/backtest/results/ga_results.json
 !stubs/*/package.json
